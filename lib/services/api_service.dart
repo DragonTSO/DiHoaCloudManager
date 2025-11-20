@@ -187,39 +187,34 @@ class ApiService {
       final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final responseBody = response.body;
+        final data = json.decode(responseBody);
         final wsData = data['data'] as Map<String, dynamic>?;
         
         // Đảm bảo có token và socket
         if (wsData == null) {
-          throw Exception('Response không có data. Full response: ${response.body}');
+          throw Exception('Response không có data. Full response: $responseBody');
         }
         
         if (wsData['token'] == null || wsData['socket'] == null) {
           throw Exception('Response thiếu token hoặc socket. Keys: ${wsData.keys.toList()}, Full data: $wsData');
         }
         
+        // Log để debug (ẩn token)
         final socketUrl = wsData['socket'] as String;
+        final debugSocket = socketUrl.replaceAll(RegExp(r'token=[^&#]+'), 'token=***')
+                                     .replaceAll(RegExp(r'/wstoken/[^/?#]+'), '/wstoken/***');
+        print('[API DEBUG] WebSocket response:');
+        print('[API DEBUG] - Socket URL: $debugSocket');
+        print('[API DEBUG] - Socket starts with: ${socketUrl.substring(0, socketUrl.length > 20 ? 20 : socketUrl.length)}...');
+        print('[API DEBUG] - Token length: ${(wsData['token'] as String).length}');
         
-        // Cảnh báo nếu socket URL có vẻ là Panel URL thay vì Wings daemon URL
-        if (socketUrl.contains('/api/client/') || socketUrl.contains('/api/application/')) {
-          throw Exception(
-            '⚠️ SAI FORMAT: Socket URL trỏ về Panel API thay vì Wings daemon!\n'
-            'URL nhận được: $socketUrl\n'
-            'URL đúng phải là: ws://<wings-ip>:8080/api/servers/<id>/ws hoặc wss://...\n'
-            'Kiểm tra lại cấu hình Pterodactyl Panel.'
-          );
-        }
-        
-        // Kiểm tra endpoint có phải WebSocket endpoint không
-        if (!socketUrl.contains('/ws') && !socketUrl.contains('/websocket')) {
-          throw Exception(
-            '⚠️ Socket URL không có endpoint WebSocket (/ws hoặc /websocket)!\n'
-            'URL nhận được: $socketUrl\n'
-            'URL đúng phải có: /api/servers/<id>/ws'
-          );
-        }
-        
+        // Trả về data từ backend (backend đã trả về URL đúng format)
+        // Không validate format vì backend có thể dùng các format khác nhau:
+        // - /api/servers/<id>/ws?token=xxx
+        // - /api/servers/<id>/wstoken/xxx
+        // - /websocket?token=xxx
+        // v.v.
         return wsData;
       } else if (response.statusCode == 401) {
         throw Exception('API Key không hợp lệ');

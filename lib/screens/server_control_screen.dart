@@ -53,6 +53,11 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging || _tabController.animation!.isAnimating) {
+        setState(() {}); // Chỉ rebuild khi đang chuyển tab
+      }
+    });
     _currentServer = widget.server;
     
     // Initialize animation controllers
@@ -382,43 +387,136 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
           ),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
+          preferredSize: const Size.fromHeight(80),
           child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white70,
-              indicatorColor: Colors.white,
-              indicatorWeight: 3,
-              labelStyle: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              tabs: const [
-                Tab(
-                  icon: Icon(Icons.dashboard, size: 20),
-                  text: 'Thông số',
-                ),
-                Tab(
-                  icon: Icon(Icons.terminal, size: 20),
-                  text: 'Console',
-                ),
-              ],
+              child: Stack(
+                children: [
+                  // Sliding indicator background
+                  AnimatedBuilder(
+                    animation: _tabController.animation!,
+                    builder: (context, child) {
+                      final animationValue = _tabController.animation!.value;
+                      final containerWidth = MediaQuery.of(context).size.width - 64;
+                      final tabWidth = containerWidth / 2;
+                      final leftPosition = animationValue * tabWidth + 4;
+                      
+                      return Positioned(
+                        left: leftPosition,
+                        top: 4,
+                        bottom: 4,
+                        child: RepaintBoundary(
+                          child: Container(
+                            width: tabWidth - 8,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(25),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.12),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // Tab items
+                  TabBar(
+                    controller: _tabController,
+                    indicator: const BoxDecoration(),
+                    labelColor: Colors.transparent,
+                    unselectedLabelColor: Colors.transparent,
+                    dividerColor: Colors.transparent,
+                    tabs: [
+                      _buildTabItem(
+                        icon: Icons.dashboard,
+                        label: 'Thông số',
+                        isSelected: _tabController.index == 0,
+                      ),
+                      _buildTabItem(
+                        icon: Icons.terminal,
+                        label: 'Console',
+                        isSelected: _tabController.index == 1,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
       body: TabBarView(
         controller: _tabController,
+        physics: const BouncingScrollPhysics(), // Thêm physics mượt hơn
         children: [
           // Tab 1: Thông số + Power buttons
           _buildStatsTab(),
           // Tab 2: Console + Power buttons + Command input
           _buildConsoleTab(),
         ],
+      ),
+    );
+  }
+  
+  /// Build custom tab item với icon và background trắng khi active - tối ưu performance
+  Widget _buildTabItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+  }) {
+    return Tab(
+      child: RepaintBoundary(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedScale(
+                scale: isSelected ? 1.05 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                child: Icon(
+                  icon,
+                  size: 19,
+                  color: isSelected
+                      ? const Color(0xFF1E1E1E)
+                      : Colors.grey[400],
+                ),
+              ),
+              const SizedBox(width: 6),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected
+                      ? const Color(0xFF1E1E1E)
+                      : Colors.grey[400],
+                ),
+                child: Text(label),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1034,7 +1132,7 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
   /// Widget chung cho power buttons
   Widget _buildPowerButtons() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -1047,51 +1145,59 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisSize: MainAxisSize.max,
         children: [
           // START button
           Expanded(
-            child: _buildAnimatedPowerButton(
-              label: 'START',
-              icon: Icons.play_arrow,
-              colors: [Colors.green[400]!, Colors.green[600]!],
-              shadowColor: Colors.green,
-              scaleController: _startScaleController,
-              scaleAnimation: _startScaleAnimation,
-              iconAnimation: _startPulseAnimation,
-              iconAnimationType: 'pulse',
-              onPressed: () => _handlePowerAction('start'),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: _buildAnimatedPowerButton(
+                label: 'START',
+                icon: Icons.play_arrow,
+                colors: [Colors.green[400]!, Colors.green[600]!],
+                shadowColor: Colors.green,
+                scaleController: _startScaleController,
+                scaleAnimation: _startScaleAnimation,
+                iconAnimation: _startPulseAnimation,
+                iconAnimationType: 'pulse',
+                onPressed: () => _handlePowerAction('start'),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
           
           // STOP button
           Expanded(
-            child: _buildAnimatedPowerButton(
-              label: 'STOP',
-              icon: Icons.stop,
-              colors: [Colors.red[400]!, Colors.red[600]!],
-              shadowColor: Colors.red,
-              scaleController: _stopScaleController,
-              scaleAnimation: _stopScaleAnimation,
-              iconAnimation: _stopPulseAnimation,
-              iconAnimationType: 'pulse',
-              onPressed: () => _handlePowerAction('stop'),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: _buildAnimatedPowerButton(
+                label: 'STOP',
+                icon: Icons.stop,
+                colors: [Colors.red[400]!, Colors.red[600]!],
+                shadowColor: Colors.red,
+                scaleController: _stopScaleController,
+                scaleAnimation: _stopScaleAnimation,
+                iconAnimation: _stopPulseAnimation,
+                iconAnimationType: 'pulse',
+                onPressed: () => _handlePowerAction('stop'),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
           
           // RESTART button
           Expanded(
-            child: _buildAnimatedPowerButton(
-              label: 'RESTART',
-              icon: Icons.refresh,
-              colors: [Colors.orange[400]!, Colors.orange[600]!],
-              shadowColor: Colors.orange,
-              scaleController: _restartScaleController,
-              scaleAnimation: _restartScaleAnimation,
-              iconAnimation: _restartRotateAnimation,
-              iconAnimationType: 'rotate',
-              onPressed: () => _handlePowerAction('restart'),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: _buildAnimatedPowerButton(
+                label: 'RESTART',
+                icon: Icons.refresh,
+                colors: [Colors.orange[400]!, Colors.orange[600]!],
+                shadowColor: Colors.orange,
+                scaleController: _restartScaleController,
+                scaleAnimation: _restartScaleAnimation,
+                iconAnimation: _restartRotateAnimation,
+                iconAnimationType: 'rotate',
+                onPressed: () => _handlePowerAction('restart'),
+              ),
             ),
           ),
         ],
@@ -1148,79 +1254,83 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
             splashColor: Colors.white.withOpacity(0.3),
             highlightColor: Colors.white.withOpacity(0.1),
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
               child: _isPowerActionLoading
                   ? const Center(
                       child: SizedBox(
-                        width: 20,
-                        height: 20,
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       ),
                     )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedBuilder(
-                          animation: iconAnimation,
-                          builder: (context, child) {
-                            if (iconAnimationType == 'rotate') {
-                              return Transform.rotate(
-                                angle: iconAnimation.value * 2 * 3.14159,
-                                child: Icon(
-                                  icon,
-                                  color: Colors.white,
-                                  size: 26,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withOpacity(0.3),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            } else {
-                              // pulse
-                              return Transform.scale(
-                                scale: iconAnimation.value,
-                                child: Icon(
-                                  icon,
-                                  color: Colors.white,
-                                  size: 26,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withOpacity(0.3),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          label,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 1.5,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black26,
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedBuilder(
+                            animation: iconAnimation,
+                            builder: (context, child) {
+                              if (iconAnimationType == 'rotate') {
+                                return Transform.rotate(
+                                  angle: iconAnimation.value * 2 * 3.14159,
+                                  child: Icon(
+                                    icon,
+                                    color: Colors.white,
+                                    size: 22,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withOpacity(0.3),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              } else {
+                                return Transform.scale(
+                                  scale: iconAnimation.value,
+                                  child: Icon(
+                                    icon,
+                                    color: Colors.white,
+                                    size: 22,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withOpacity(0.3),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                            },
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Text(
+                            label,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1.0,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black26,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
             ),
           ),

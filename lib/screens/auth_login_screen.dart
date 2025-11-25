@@ -1,43 +1,25 @@
 import 'package:flutter/material.dart';
-import '../utils/storage.dart';
 import '../services/auth_service.dart';
 
-/// Màn hình đăng nhập Panel URL và API Key (sau khi đã đăng nhập Firebase)
-class PanelLoginScreen extends StatefulWidget {
-  const PanelLoginScreen({super.key});
+class AuthLoginScreen extends StatefulWidget {
+  const AuthLoginScreen({super.key});
 
   @override
-  State<PanelLoginScreen> createState() => _PanelLoginScreenState();
+  State<AuthLoginScreen> createState() => _AuthLoginScreenState();
 }
 
-class _PanelLoginScreenState extends State<PanelLoginScreen> {
-  final _panelUrlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
+class _AuthLoginScreenState extends State<AuthLoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _authService = AuthService();
   bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedCredentials();
-  }
-
-  Future<void> _loadSavedCredentials() async {
-    final panelUrl = await Storage.getPanelUrl();
-    final apiKey = await Storage.getApiKey();
-    if (panelUrl != null) {
-      _panelUrlController.text = panelUrl;
-    }
-    if (apiKey != null) {
-      _apiKeyController.text = apiKey;
-    }
-  }
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _panelUrlController.dispose();
-    _apiKeyController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -48,21 +30,22 @@ class _PanelLoginScreenState extends State<PanelLoginScreen> {
       });
 
       try {
-        // Lưu thông tin đăng nhập
-        await Storage.saveCredentials(
-          _panelUrlController.text.trim(),
-          _apiKeyController.text.trim(),
+        final userCredential = await _authService.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
         );
 
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/server-list');
+        if (userCredential != null && mounted) {
+          // Điều hướng đến màn hình đăng nhập Panel
+          Navigator.pushReplacementNamed(context, '/panel-login');
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Lỗi: ${e.toString()}'),
+              content: Text(e.toString().replaceAll('Exception: ', '')),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
             ),
           );
         }
@@ -72,6 +55,41 @@ class _PanelLoginScreenState extends State<PanelLoginScreen> {
             _isLoading = false;
           });
         }
+      }
+    }
+  }
+
+  Future<void> _handleForgotPassword() async {
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng nhập email để reset mật khẩu'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await _authService.sendPasswordResetEmail(_emailController.text.trim());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã gửi email reset mật khẩu. Vui lòng kiểm tra hộp thư.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     }
   }
@@ -101,7 +119,7 @@ class _PanelLoginScreenState extends State<PanelLoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Logo với animation
+                    // Logo
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -127,55 +145,15 @@ class _PanelLoginScreenState extends State<PanelLoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Quản lý server Pterodactyl dễ dàng',
+                      'Đăng nhập để tiếp tục',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.white.withOpacity(0.9),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    // Hiển thị thông tin người dùng đã đăng nhập
-                    FutureBuilder(
-                      future: Future.value(_authService.currentUser),
-                      builder: (context, snapshot) {
-                        final user = _authService.currentUser;
-                        if (user != null) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.person,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    user.email ?? 'Người dùng',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                    const SizedBox(height: 32),
-                  
+                    const SizedBox(height: 48),
+
                     // Card chứa form
                     Container(
                       decoration: BoxDecoration(
@@ -193,52 +171,80 @@ class _PanelLoginScreenState extends State<PanelLoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Panel URL field
+                          // Email field
                           TextFormField(
-                            controller: _panelUrlController,
+                            controller: _emailController,
                             decoration: InputDecoration(
-                              labelText: 'Panel URL',
-                              hintText: 'https://panel.example.com',
-                              prefixIcon: Icon(Icons.link, color: Colors.blue[700]),
+                              labelText: 'Email',
+                              hintText: 'example@email.com',
+                              prefixIcon: Icon(Icons.email, color: Colors.blue[700]),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            keyboardType: TextInputType.url,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Vui lòng nhập Panel URL';
+                                return 'Vui lòng nhập email';
                               }
-                              if (!value.startsWith('http://') && 
-                                  !value.startsWith('https://')) {
-                                return 'URL phải bắt đầu bằng http:// hoặc https://';
+                              if (!value.contains('@') || !value.contains('.')) {
+                                return 'Email không hợp lệ';
                               }
                               return null;
                             },
                           ),
                           const SizedBox(height: 20),
-                          
-                          // API Key field
+
+                          // Password field
                           TextFormField(
-                            controller: _apiKeyController,
+                            controller: _passwordController,
                             decoration: InputDecoration(
-                              labelText: 'Client API Key',
-                              hintText: 'ptlc_xxxxxxxxxxxxx',
-                              prefixIcon: Icon(Icons.vpn_key, color: Colors.blue[700]),
+                              labelText: 'Mật khẩu',
+                              hintText: 'Nhập mật khẩu',
+                              prefixIcon: Icon(Icons.lock, color: Colors.blue[700]),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            obscureText: true,
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _handleLogin(),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Vui lòng nhập API Key';
+                                return 'Vui lòng nhập mật khẩu';
                               }
                               return null;
                             },
                           ),
-                          const SizedBox(height: 32),
-                          
+                          const SizedBox(height: 12),
+
+                          // Forgot password link
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _handleForgotPassword,
+                              child: Text(
+                                'Quên mật khẩu?',
+                                style: TextStyle(
+                                  color: Colors.blue[700],
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
                           // Login button
                           Container(
                             decoration: BoxDecoration(
@@ -282,7 +288,7 @@ class _PanelLoginScreenState extends State<PanelLoginScreen> {
                                         Icon(Icons.login, color: Colors.white),
                                         SizedBox(width: 8),
                                         Text(
-                                          'Đăng nhập',
+                                          'Đăng Nhập',
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
@@ -296,45 +302,34 @@ class _PanelLoginScreenState extends State<PanelLoginScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    // Nút đăng xuất
-                    TextButton(
-                      onPressed: () async {
-                        try {
-                          await _authService.signOut();
-                          if (mounted) {
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              '/login',
-                              (route) => false,
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Lỗi đăng xuất: ${e.toString()}'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.logout, color: Colors.white70, size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Đăng xuất',
+                    const SizedBox(height: 24),
+
+                    // Link to register
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Chưa có tài khoản? ',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 14,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/register');
+                          },
+                          child: const Text(
+                            'Đăng ký',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white,
                               fontSize: 14,
+                              fontWeight: FontWeight.bold,
                               decoration: TextDecoration.underline,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

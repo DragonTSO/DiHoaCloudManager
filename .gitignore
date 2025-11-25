@@ -47,3 +47,8 @@ app.*.map.json
 # Android local.properties (chứa SDK path)
 **/local.properties
 android/local.properties
+
+# Firebase configuration files (chứa thông tin nhạy cảm)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart

@@ -1,10 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
+import 'screens/welcome_screen.dart';
+import 'screens/auth_login_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/server_list_screen.dart';
 import 'screens/server_control_screen.dart';
 import 'models/server.dart';
+import 'widgets/auth_guard.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Khởi tạo Firebase với error handling
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('✅ Firebase đã được khởi tạo thành công');
+  } catch (e) {
+    // Nếu Firebase chưa được cấu hình, log lỗi nhưng vẫn chạy app
+    debugPrint('⚠️ Firebase chưa được cấu hình: $e');
+    debugPrint('💡 Chạy "flutterfire configure" để cấu hình Firebase');
+  }
+  
   runApp(const MyApp());
 }
 
@@ -57,13 +78,29 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => const LoginScreen(),
-        '/server-list': (context) => const ServerListScreen(),
+        '/': (context) => const WelcomeScreen(),
+        '/login': (context) => const AuthLoginScreen(),
+        '/register': (context) => const RegisterScreen(),
+        '/panel-login': (context) => const _ProtectedRoute(child: PanelLoginScreen()),
+        '/server-list': (context) => const _ProtectedRoute(child: ServerListScreen()),
         '/server-control': (context) {
           final server = ModalRoute.of(context)!.settings.arguments as Server;
-          return ServerControlScreen(server: server);
+          return _ProtectedRoute(child: ServerControlScreen(server: server));
         },
       },
     );
   }
 }
+
+/// Wrapper để bảo vệ route cần authentication
+class _ProtectedRoute extends StatelessWidget {
+  final Widget child;
+
+  const _ProtectedRoute({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AuthGuard(child: child);
+  }
+}
+

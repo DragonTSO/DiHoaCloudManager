@@ -1,106 +1,116 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'firebase_options.dart';
-import 'screens/welcome_screen.dart';
-import 'screens/auth_login_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/server_list_screen.dart';
+import 'package:flutter/services.dart';
+import 'screens/splash_screen.dart';
+import 'screens/auth_screen.dart';
+import 'screens/dashboard_screen.dart';
 import 'screens/server_control_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/change_password_screen.dart';
 import 'models/server.dart';
-import 'widgets/auth_guard.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Khởi tạo Firebase với error handling
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    debugPrint('✅ Firebase đã được khởi tạo thành công');
-  } catch (e) {
-    // Nếu Firebase chưa được cấu hình, log lỗi nhưng vẫn chạy app
-    debugPrint('⚠️ Firebase chưa được cấu hình: $e');
-    debugPrint('💡 Chạy "flutterfire configure" để cấu hình Firebase');
-  }
+  // Set system UI overlay style for dark theme
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Color(0xFF0A0E21),
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
   
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key}); 
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'DiHoaManager',
+      title: 'DiHoaCloud',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2196F3),
-          brightness: Brightness.light,
-        ),
         useMaterial3: true,
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: const Color(0xFFF5F7FA),
-        cardTheme: CardThemeData(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0A0E21),
+        primaryColor: const Color(0xFF6C8EEF),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF6C8EEF),
+          secondary: Color(0xFF6C8EEF),
+          surface: Color(0xFF1A1F3C),
+          error: Colors.red,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF0A0E21),
+          elevation: 0,
+          centerTitle: false,
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white,
+          fillColor: const Color(0xFF1A1F3C),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderSide: BorderSide.none,
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            elevation: 2,
+            backgroundColor: const Color(0xFF6C8EEF),
+            foregroundColor: Colors.white,
+            elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
         ),
+        cardTheme: CardThemeData(
+          color: const Color(0xFF1A1F3C),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
       ),
       initialRoute: '/',
-      routes: {
-        '/': (context) => const WelcomeScreen(),
-        '/login': (context) => const AuthLoginScreen(),
-        '/register': (context) => const RegisterScreen(),
-        '/panel-login': (context) => const _ProtectedRoute(child: PanelLoginScreen()),
-        '/server-list': (context) => const _ProtectedRoute(child: ServerListScreen()),
-        '/server-control': (context) {
-          final server = ModalRoute.of(context)!.settings.arguments as Server;
-          return _ProtectedRoute(child: ServerControlScreen(server: server));
-        },
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(
+              builder: (_) => const SplashScreen(),
+            );
+          case '/auth':
+            final isLogin = settings.arguments as bool? ?? false;
+            return MaterialPageRoute(
+              builder: (_) => AuthScreen(initialLogin: isLogin),
+            );
+          case '/dashboard':
+            return MaterialPageRoute(
+              builder: (_) => const DashboardScreen(),
+            );
+          case '/server-control':
+            final server = settings.arguments as Server;
+            return MaterialPageRoute(
+              builder: (_) => ServerControlScreen(server: server),
+            );
+          case '/profile':
+            return MaterialPageRoute(
+              builder: (_) => const ProfileScreen(),
+            );
+          case '/change-password':
+            return MaterialPageRoute(
+              builder: (_) => const ChangePasswordScreen(),
+            );
+          default:
+            return MaterialPageRoute(
+              builder: (_) => const SplashScreen(),
+            );
+        }
       },
     );
   }
 }
-
-/// Wrapper để bảo vệ route cần authentication
-class _ProtectedRoute extends StatelessWidget {
-  final Widget child;
-
-  const _ProtectedRoute({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return AuthGuard(child: child);
-  }
-}
-

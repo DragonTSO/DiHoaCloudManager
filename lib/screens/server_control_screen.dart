@@ -18,29 +18,13 @@ class ServerControlScreen extends StatefulWidget {
   State<ServerControlScreen> createState() => _ServerControlScreenState();
 }
 
-class _ServerControlScreenState extends State<ServerControlScreen> with TickerProviderStateMixin {
+class _ServerControlScreenState extends State<ServerControlScreen> {
   final _commandController = TextEditingController();
   final _consoleScrollController = ScrollController();
   final List<String> _consoleLogs = [];
-  late TabController _tabController;
-  
-  // Animation controllers cho buttons
-  late AnimationController _startScaleController;
-  late AnimationController _stopScaleController;
-  late AnimationController _restartScaleController;
-  late AnimationController _startPulseController;
-  late AnimationController _stopPulseController;
-  late AnimationController _restartRotateController;
-  
-  late Animation<double> _startScaleAnimation;
-  late Animation<double> _stopScaleAnimation;
-  late Animation<double> _restartScaleAnimation;
-  late Animation<double> _startPulseAnimation;
-  late Animation<double> _stopPulseAnimation;
-  late Animation<double> _restartRotateAnimation;
   
   Server? _currentServer;
-  ServerStats? _currentStats; // Stats từ WebSocket
+  ServerStats? _currentStats;
   bool _isLoading = false;
   bool _isPowerActionLoading = false;
   bool _isConnecting = false;
@@ -52,73 +36,13 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging || _tabController.animation!.isAnimating) {
-        setState(() {}); // Chỉ rebuild khi đang chuyển tab
-      }
-    });
     _currentServer = widget.server;
-    
-    // Initialize animation controllers
-    _startScaleController = AnimationController(
-      duration: const Duration(milliseconds: 150),
-      vsync: this,
-    );
-    _stopScaleController = AnimationController(
-      duration: const Duration(milliseconds: 150),
-      vsync: this,
-    );
-    _restartScaleController = AnimationController(
-      duration: const Duration(milliseconds: 150),
-      vsync: this,
-    );
-    _startPulseController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    )..repeat(reverse: true);
-    _stopPulseController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    )..repeat(reverse: true);
-    _restartRotateController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat();
-    
-    // Initialize animations
-    _startScaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _startScaleController, curve: Curves.easeInOut),
-    );
-    _stopScaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _stopScaleController, curve: Curves.easeInOut),
-    );
-    _restartScaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _restartScaleController, curve: Curves.easeInOut),
-    );
-    _startPulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _startPulseController, curve: Curves.easeInOut),
-    );
-    _stopPulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _stopPulseController, curve: Curves.easeInOut),
-    );
-    _restartRotateAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _restartRotateController, curve: Curves.linear),
-    );
-    
     _refreshServerStatus();
     _connectWebSocket();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _startScaleController.dispose();
-    _stopScaleController.dispose();
-    _restartScaleController.dispose();
-    _startPulseController.dispose();
-    _stopPulseController.dispose();
-    _restartRotateController.dispose();
     _logSubscription?.cancel();
     _statsSubscription?.cancel();
     _webSocketService?.disconnect();
@@ -131,7 +55,7 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
     setState(() {
       _isConnecting = true;
       _consoleLogs.clear();
-      _consoleLogs.add('[INFO] Đang kết nối tới server ${widget.server.name}...');
+      _consoleLogs.add('[INFO] Connecting to ${widget.server.name}...');
     });
 
     try {
@@ -141,17 +65,15 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
       if (connected && mounted) {
         setState(() {
           _isConnecting = false;
-          _consoleLogs.add('[INFO] Đã kết nối thành công!');
+          _consoleLogs.add('[INFO] Connected successfully!');
         });
 
-        // Lắng nghe log stream
         _logSubscription = _webSocketService!.logStream.listen((log) {
           if (mounted) {
             setState(() {
               _consoleLogs.add(log);
             });
             
-            // Auto scroll to bottom
             Future.delayed(const Duration(milliseconds: 100), () {
               if (_consoleScrollController.hasClients) {
                 _consoleScrollController.animateTo(
@@ -164,7 +86,6 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
           }
         });
 
-        // Lắng nghe stats stream để cập nhật resource stats
         _statsSubscription = _webSocketService!.statsStream.listen((stats) {
           if (mounted) {
             setState(() {
@@ -175,98 +96,17 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
       } else {
         setState(() {
           _isConnecting = false;
-          _consoleLogs.add('[ERROR] Không thể kết nối. Vui lòng thử lại.');
+          _consoleLogs.add('[ERROR] Failed to connect. Please try again.');
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isConnecting = false;
-          _consoleLogs.add('[ERROR] Lỗi kết nối: ${e.toString()}');
+          _consoleLogs.add('[ERROR] Connection error: ${e.toString()}');
         });
       }
     }
-  }
-
-  /// Widget để hiển thị một stat card
-  Widget _buildStatCard({
-    required IconData icon,
-    required String label,
-    required String value,
-    String? value2,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            color.withOpacity(0.15),
-            color.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 18, color: color),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          if (value2 != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              value2,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 
   Future<void> _refreshServerStatus() async {
@@ -295,15 +135,11 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
     _commandController.clear();
     
     if (_webSocketService?.isConnected ?? false) {
-      // Gửi command qua WebSocket
       _webSocketService!.sendCommand(command);
     } else {
-      // Nếu chưa kết nối, hiển thị thông báo
       setState(() {
-        _consoleLogs.add('[ERROR] Chưa kết nối tới server. Vui lòng đợi...');
+        _consoleLogs.add('[ERROR] Not connected to server.');
       });
-      
-      // Thử kết nối lại
       _connectWebSocket();
     }
   }
@@ -322,30 +158,21 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Đã gửi lệnh $signal server thành công'),
+              content: Text('$signal command sent successfully'),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 2),
             ),
           );
           
-          // Đợi một chút rồi refresh status
           await Future.delayed(const Duration(seconds: 2));
           await _refreshServerStatus();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Không thể gửi lệnh. Vui lòng thử lại.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Lỗi: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
@@ -362,157 +189,166 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
 
   @override
   Widget build(BuildContext context) {
+    final isRunning = _currentServer?.isRunning ?? false;
+    
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0E21),
       appBar: AppBar(
-        title: Text(
+        backgroundColor: const Color(0xFF0A0E21),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
+          children: [
+            Text(
           widget.server.name,
           style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.blue[600]!,
-                Colors.blue[800]!,
-              ],
-            ),
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(80),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
               ),
-              child: Stack(
+            ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+                color: isRunning
+                    ? Colors.green.withOpacity(0.2)
+                    : Colors.red.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isRunning ? Colors.green : Colors.red,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Sliding indicator background
-                  AnimatedBuilder(
-                    animation: _tabController.animation!,
-                    builder: (context, child) {
-                      final animationValue = _tabController.animation!.value;
-                      final containerWidth = MediaQuery.of(context).size.width - 64;
-                      final tabWidth = containerWidth / 2;
-                      final leftPosition = animationValue * tabWidth + 4;
-                      
-                      return Positioned(
-                        left: leftPosition,
-                        top: 4,
-                        bottom: 4,
-                        child: RepaintBoundary(
-                          child: Container(
-                            width: tabWidth - 8,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(25),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.12),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
+                  Container(
+                    width: 8,
+                    height: 8,
+              decoration: BoxDecoration(
+                      color: isRunning ? Colors.green : Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isRunning ? 'Online' : 'Offline',
+                    style: TextStyle(
+                      color: isRunning ? Colors.green : Colors.red,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                  // Tab items
-                  TabBar(
-                    controller: _tabController,
-                    indicator: const BoxDecoration(),
-                    labelColor: Colors.transparent,
-                    unselectedLabelColor: Colors.transparent,
-                    dividerColor: Colors.transparent,
-                    tabs: [
-                      _buildTabItem(
-                        icon: Icons.dashboard,
-                        label: 'Thông số',
-                        isSelected: _tabController.index == 0,
-                      ),
-                      _buildTabItem(
-                        icon: Icons.terminal,
-                        label: 'Console',
-                        isSelected: _tabController.index == 1,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
+          ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        physics: const BouncingScrollPhysics(), // Thêm physics mượt hơn
+      body: Column(
         children: [
-          // Tab 1: Thông số + Power buttons
-          _buildStatsTab(),
-          // Tab 2: Console + Power buttons + Command input
-          _buildConsoleTab(),
+          // Power control buttons
+          _buildPowerButtons(),
+          
+          // Resources section
+          _buildResourcesSection(),
+          
+          // Console section
+          Expanded(
+            child: _buildConsoleSection(),
+          ),
+          
+          // Command input
+          _buildCommandInput(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPowerButtons() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildPowerButton(
+              label: 'Start',
+              icon: Icons.play_arrow,
+              color: Colors.green,
+              onPressed: () => _handlePowerAction('start'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildPowerButton(
+              label: 'Stop',
+              icon: Icons.stop,
+              color: Colors.red,
+              onPressed: () => _handlePowerAction('stop'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildPowerButton(
+              label: 'Restart',
+              icon: Icons.refresh,
+              color: Colors.orange,
+              onPressed: () => _handlePowerAction('restart'),
+            ),
+          ),
         ],
       ),
     );
   }
   
-  /// Build custom tab item với icon và background trắng khi active - tối ưu performance
-  Widget _buildTabItem({
-    required IconData icon,
+  Widget _buildPowerButton({
     required String label,
-    required bool isSelected,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
   }) {
-    return Tab(
-      child: RepaintBoundary(
+    return Material(
+      color: color.withOpacity(0.15),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: _isPowerActionLoading ? null : onPressed,
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedScale(
-                scale: isSelected ? 1.05 : 1.0,
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
-                child: Icon(
-                  icon,
-                  size: 19,
-                  color: isSelected
-                      ? const Color(0xFF1E1E1E)
-                      : Colors.grey[400],
-                ),
-              ),
-              const SizedBox(width: 6),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: color.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: _isPowerActionLoading
+              ? Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: color,
+                    ),
+                  ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: color, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      label,
                 style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected
-                      ? const Color(0xFF1E1E1E)
-                      : Colors.grey[400],
-                ),
-                child: Text(label),
+                        color: color,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
               ),
             ],
           ),
@@ -521,252 +357,104 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
     );
   }
 
-  /// Tab 1: Thông số resource + Power buttons
-  Widget _buildStatsTab() {
-    return Column(
-      children: [
-        // Server status header
-        _buildStatusHeader(),
-        
-        // Resource stats widget
-        if (_currentStats != null)
-          Expanded(
-            child: SingleChildScrollView(
+  Widget _buildResourcesSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
               padding: const EdgeInsets.all(16),
-              child: Container(
-                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white,
-                      Colors.blue.shade50,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withOpacity(0.1),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
+        color: const Color(0xFF1A1F3C),
+        borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.analytics,
-                            color: Colors.blue[700],
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
                         const Text(
-                          'Resource Usage',
+            'Resources',
                           style: TextStyle(
-                            fontSize: 20,
+              color: Colors.white,
+              fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    // CPU và RAM
+          const SizedBox(height: 16),
                     Row(
                       children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            icon: Icons.speed,
-                            label: 'CPU',
-                            value: '${_currentStats!.cpuPercent.toStringAsFixed(1)}%',
-                            color: Colors.blue,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatCard(
-                            icon: Icons.memory,
-                            label: 'RAM',
-                            value: '${_currentStats!.ramPercent.toStringAsFixed(1)}%',
-                            value2: '${_currentStats!.ramUsedFormatted} / ${_currentStats!.ramLimitFormatted}',
-                            color: Colors.purple,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Disk và Network
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            icon: Icons.storage,
-                            label: 'Disk',
-                            value: _currentStats!.diskUsedFormatted,
-                            color: Colors.orange,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatCard(
-                            icon: Icons.network_check,
-                            label: 'Network',
-                            value: '↑ ${_currentStats!.txBytesFormatted}',
-                            value2: '↓ ${_currentStats!.rxBytesFormatted}',
-                            color: Colors.green,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_currentStats!.uptime != null) ...[
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.purple.shade50,
-                              Colors.purple.shade100,
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.purple.shade200,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.purple.shade200,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.timer,
-                                size: 20,
-                                color: Colors.purple,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Uptime: ${_currentStats!.uptimeFormatted}',
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.purple[900],
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              _buildResourceItem(
+                'CPU',
+                _currentStats != null
+                    ? '${_currentStats!.cpuPercent.toStringAsFixed(0)}%'
+                    : '${_currentServer?.cpu?.toStringAsFixed(0) ?? '0'}%',
+                Colors.blue,
               ),
-            ),
-          )
-        else
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      shape: BoxShape.circle,
+              const SizedBox(width: 24),
+              _buildResourceItem(
+                'RAM',
+                _currentStats != null
+                    ? '${_currentStats!.ramUsedFormatted}/${_currentStats!.ramLimitFormatted}'
+                    : _formatRam(_currentServer?.ram),
+                Colors.purple,
+              ),
+              const SizedBox(width: 24),
+              _buildResourceItem(
+                'DISK',
+                _currentStats != null
+                    ? _currentStats!.diskUsedFormatted
+                    : 'N/A',
+                Colors.orange,
+              ),
+            ],
+                        ),
+                      ],
                     ),
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[700]!),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+    );
+  }
+
+  Widget _buildResourceItem(String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+          label,
+                              style: TextStyle(
+            color: Colors.grey.shade500,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
                   Text(
-                    'Đang chờ dữ liệu...',
+          value,
                     style: TextStyle(
+            color: color,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      'Kết nối WebSocket để xem thông số real-time',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 13,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
-
-        // Power control buttons
-        _buildPowerButtons(),
+        ),
       ],
     );
   }
 
-  /// Tab 2: Console + Power buttons + Command input
-  Widget _buildConsoleTab() {
-    return Column(
-      children: [
-        // Server status header
-        _buildStatusHeader(),
-
-        // Power control buttons
-        _buildPowerButtons(),
-
-        // Console area
-        Expanded(
-          child: Container(
+  Widget _buildConsoleSection() {
+    return Container(
             margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
+        color: const Color(0xFF0D1117),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: Colors.grey.shade700,
+          color: const Color(0xFF30363D),
                 width: 1,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
                 ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
               child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Console header
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade900,
+            decoration: const BoxDecoration(
                       border: Border(
                         bottom: BorderSide(
-                          color: Colors.grey.shade700,
+                  color: Color(0xFF30363D),
                           width: 1,
                         ),
                       ),
@@ -774,8 +462,8 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
                     child: Row(
                       children: [
                         Container(
-                          width: 12,
-                          height: 12,
+                  width: 10,
+                  height: 10,
                           decoration: BoxDecoration(
                             color: (_webSocketService?.isConnected ?? false)
                                 ? Colors.green
@@ -784,20 +472,14 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
+                const Text(
                           'Console',
                           style: TextStyle(
-                            color: Colors.grey.shade300,
+                    color: Colors.white,
                             fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        Icon(
-                          Icons.code,
-                          size: 18,
-                          color: Colors.grey.shade400,
-                        ),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                       ],
                     ),
                   ),
@@ -816,7 +498,7 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
                                       ),
                                       const SizedBox(height: 16),
                                       Text(
-                                        'Đang kết nối Console...',
+                                'Connecting to console...',
                                         style: TextStyle(
                                           color: Colors.grey.shade400,
                                           fontSize: 14,
@@ -825,9 +507,9 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
                                     ],
                                   )
                                 : Text(
-                                    'Console sẽ hiển thị ở đây...',
+                            'Console output will appear here...',
                                     style: TextStyle(
-                                      color: Colors.grey.shade500,
+                              color: Colors.grey.shade600,
                                       fontSize: 14,
                                     ),
                                   ),
@@ -839,7 +521,6 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
                             itemBuilder: (context, index) {
                               final log = _consoleLogs[index];
                               
-                              // Xác định màu mặc định dựa trên loại log (nếu không có ANSI codes)
                               Color defaultColor = Colors.green.shade300;
                               if (log.contains('[ERROR]')) {
                                 defaultColor = Colors.red.shade300;
@@ -851,49 +532,60 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
                                 defaultColor = Colors.yellow.shade300;
                               }
                               
-                              // Parse ANSI escape codes và render với RichText
                               final textSpan = AnsiParser.parseAnsi(log, defaultColor: defaultColor);
                               
-                              return RichText(
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 1),
+                        child: RichText(
                                 text: textSpan,
+                        ),
                               );
                             },
                           ),
                   ),
                 ],
               ),
-            ),
+    );
+  }
+
+  Widget _buildCommandInput() {
+    return Container(
+          padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A1F3C),
+        border: Border(
+          top: BorderSide(
+            color: Color(0xFF30363D),
+            width: 1,
           ),
         ),
-
-        // Command input
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, -2),
-              ),
-            ],
           ),
           child: Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _commandController,
+              style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    hintText: 'Nhập lệnh...',
+                hintText: 'Type command here...',
+                hintStyle: TextStyle(color: Colors.grey.shade600),
+                filled: true,
+                fillColor: const Color(0xFF0D1117),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF30363D)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF30363D)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF6C8EEF)),
+                ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 12,
+                  vertical: 14,
                     ),
                   ),
                   onSubmitted: (_) => _sendCommand(),
@@ -903,440 +595,31 @@ class _ServerControlScreenState extends State<ServerControlScreen> with TickerPr
               ElevatedButton(
                 onPressed: _sendCommand,
                 style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C8EEF),
+              foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 16,
                   ),
-                  backgroundColor: Colors.blue,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: const Text(
-                  'Gửi',
+              'Send',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ],
           ),
-        ),
-      ],
     );
   }
 
-  /// Widget chung cho status header
-  Widget _buildStatusHeader() {
-    final isRunning = _currentServer?.isRunning ?? false;
-    final isConnected = _webSocketService?.isConnected ?? false;
-    
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isRunning
-              ? [
-                  Colors.green.shade50,
-                  Colors.green.shade100.withOpacity(0.3),
-                  Colors.white,
-                ]
-              : [
-                  Colors.grey.shade100,
-                  Colors.grey.shade50,
-                  Colors.white,
-                ],
-        ),
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.grey.shade200,
-            width: 1,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Status indicator với icon
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isRunning
-                    ? [
-                        Colors.green.shade100,
-                        Colors.green.shade50,
-                      ]
-                    : [
-                        Colors.grey.shade200,
-                        Colors.grey.shade100,
-                      ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isRunning
-                    ? Colors.green.shade300
-                    : Colors.grey.shade300,
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: isRunning ? Colors.green : Colors.red,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isRunning ? Colors.green : Colors.red)
-                            .withOpacity(0.6),
-                        blurRadius: 6,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  isRunning ? Icons.check_circle : Icons.cancel,
-                  size: 16,
-                  color: isRunning ? Colors.green[700] : Colors.red[700],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          
-          // Status info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      isRunning ? 'Đang chạy' : 'Đã tắt',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: isRunning ? Colors.green[700] : Colors.red[700],
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: isConnected ? Colors.blue : Colors.grey,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        isConnected ? 'WebSocket đã kết nối' : 'WebSocket chưa kết nối',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          // Action buttons
-          if (_isLoading)
-            Container(
-              padding: const EdgeInsets.all(8),
-              child: const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                ),
-              ),
-            )
-          else
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: IconButton(
-                    icon: Icon(Icons.refresh, size: 20),
-                    color: Colors.blue[700],
-                    iconSize: 20,
-                    padding: const EdgeInsets.all(8),
-                    constraints: const BoxConstraints(),
-                    onPressed: () async {
-                      setState(() => _isLoading = true);
-                      await _refreshServerStatus();
-                      setState(() => _isLoading = false);
-                    },
-                    tooltip: 'Làm mới',
-                  ),
-                ),
-                if (!isConnected) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: IconButton(
-                      icon: Icon(Icons.replay, size: 20),
-                      color: Colors.orange[700],
-                      iconSize: 20,
-                      padding: const EdgeInsets.all(8),
-                      constraints: const BoxConstraints(),
-                      onPressed: _connectWebSocket,
-                      tooltip: 'Kết nối lại',
-                    ),
-                  ),
-                ],
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// Widget chung cho power buttons
-  Widget _buildPowerButtons() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        mainAxisSize: MainAxisSize.max,
-        children: [
-          // START button
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: _buildAnimatedPowerButton(
-                label: 'START',
-                icon: Icons.play_arrow,
-                colors: [Colors.green[400]!, Colors.green[600]!],
-                shadowColor: Colors.green,
-                scaleController: _startScaleController,
-                scaleAnimation: _startScaleAnimation,
-                iconAnimation: _startPulseAnimation,
-                iconAnimationType: 'pulse',
-                onPressed: () => _handlePowerAction('start'),
-              ),
-            ),
-          ),
-          
-          // STOP button
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: _buildAnimatedPowerButton(
-                label: 'STOP',
-                icon: Icons.stop,
-                colors: [Colors.red[400]!, Colors.red[600]!],
-                shadowColor: Colors.red,
-                scaleController: _stopScaleController,
-                scaleAnimation: _stopScaleAnimation,
-                iconAnimation: _stopPulseAnimation,
-                iconAnimationType: 'pulse',
-                onPressed: () => _handlePowerAction('stop'),
-              ),
-            ),
-          ),
-          
-          // RESTART button
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 6),
-              child: _buildAnimatedPowerButton(
-                label: 'RESTART',
-                icon: Icons.refresh,
-                colors: [Colors.orange[400]!, Colors.orange[600]!],
-                shadowColor: Colors.orange,
-                scaleController: _restartScaleController,
-                scaleAnimation: _restartScaleAnimation,
-                iconAnimation: _restartRotateAnimation,
-                iconAnimationType: 'rotate',
-                onPressed: () => _handlePowerAction('restart'),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  /// Widget button với animation
-  Widget _buildAnimatedPowerButton({
-    required String label,
-    required IconData icon,
-    required List<Color> colors,
-    required Color shadowColor,
-    required AnimationController scaleController,
-    required Animation<double> scaleAnimation,
-    required Animation<double> iconAnimation,
-    required String iconAnimationType, // 'pulse' or 'rotate'
-    required VoidCallback onPressed,
-  }) {
-    return ScaleTransition(
-      scale: scaleAnimation,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: colors,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: shadowColor.withOpacity(0.5),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-              spreadRadius: 2,
-            ),
-            BoxShadow(
-              color: shadowColor.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTapDown: (_) => scaleController.forward(),
-            onTapUp: (_) {
-              scaleController.reverse();
-              onPressed();
-            },
-            onTapCancel: () => scaleController.reverse(),
-            borderRadius: BorderRadius.circular(16),
-            splashColor: Colors.white.withOpacity(0.3),
-            highlightColor: Colors.white.withOpacity(0.1),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
-              child: _isPowerActionLoading
-                  ? const Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      ),
-                    )
-                  : FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedBuilder(
-                            animation: iconAnimation,
-                            builder: (context, child) {
-                              if (iconAnimationType == 'rotate') {
-                                return Transform.rotate(
-                                  angle: iconAnimation.value * 2 * 3.14159,
-                                  child: Icon(
-                                    icon,
-                                    color: Colors.white,
-                                    size: 22,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withOpacity(0.3),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              } else {
-                                return Transform.scale(
-                                  scale: iconAnimation.value,
-                                  child: Icon(
-                                    icon,
-                                    color: Colors.white,
-                                    size: 22,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withOpacity(0.3),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            label,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 1.0,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black26,
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
+  String _formatRam(double? bytes) {
+    if (bytes == null) return 'N/A';
+    final gb = bytes / (1024 * 1024 * 1024);
+    return '${gb.toStringAsFixed(1)} GB';
   }
 }
-

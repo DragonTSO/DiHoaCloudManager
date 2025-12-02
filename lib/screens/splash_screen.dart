@@ -1,146 +1,127 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import '../utils/storage.dart';
-import '../utils/firebase_helper.dart';
-import 'auth_login_screen.dart';
-import 'login_screen.dart';
-import 'server_list_screen.dart';
 
-/// Màn hình splash để kiểm tra trạng thái đăng nhập
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _checkAuthState();
-  }
-
-  Future<void> _checkAuthState() async {
-    // Đợi một chút để hiển thị splash screen
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (!mounted) return;
-
-    // Kiểm tra Firebase có được khởi tạo không
-    if (!FirebaseHelper.isFirebaseInitialized) {
-      // Firebase chưa cấu hình, chuyển thẳng đến Panel Login (flow cũ)
-      debugPrint('⚠️ Firebase chưa cấu hình, sử dụng flow cũ');
-      final panelUrl = await Storage.getPanelUrl();
-      final apiKey = await Storage.getApiKey();
-      
-      if (panelUrl != null && apiKey != null && panelUrl.isNotEmpty && apiKey.isNotEmpty) {
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/server-list');
-        }
-      } else {
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/panel-login');
-        }
-      }
-      return;
-    }
-
-    try {
-      final authService = AuthService();
-      final currentUser = authService.currentUser;
-
-      // Kiểm tra Firebase Auth
-      if (currentUser != null) {
-        // Đã đăng nhập Firebase -> Kiểm tra Panel credentials
-        final panelUrl = await Storage.getPanelUrl();
-        final apiKey = await Storage.getApiKey();
-
-        if (panelUrl != null && apiKey != null && panelUrl.isNotEmpty && apiKey.isNotEmpty) {
-          // Đã có cả Firebase Auth và Panel credentials -> Vào Server List
-          if (mounted) {
-            Navigator.pushReplacementNamed(context, '/server-list');
-          }
-        } else {
-          // Chưa có Panel credentials -> Vào Panel Login
-          if (mounted) {
-            Navigator.pushReplacementNamed(context, '/panel-login');
-          }
-        }
-      } else {
-        // Chưa đăng nhập Firebase -> Vào Auth Login
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/login');
-        }
-      }
-    } catch (e) {
-      // Nếu có lỗi (Firebase chưa cấu hình), vẫn cho vào Auth Login
-      debugPrint('⚠️ Error checking auth: $e');
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF2196F3),
-              const Color(0xFF1976D2),
-              const Color(0xFF0D47A1),
-            ],
-          ),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo
-              Container(
-                padding: const EdgeInsets.all(30),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.cloud_queue,
-                  size: 100,
-                  color: Colors.white,
-                ),
+      backgroundColor: const Color(0xFF0A0E21),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const Spacer(flex: 2),
+            // Logo
+            Center(
+              child: Column(
+                children: [
+                  Image.asset(
+                    'assets/logo.png',
+                    width: 140,
+                    height: 140,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'DiHoaCloud',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Server Manager',
+                    style: TextStyle(
+                      color: Colors.blueAccent.shade100,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 32),
-              const Text(
-                'DiHoaManager',
+            ),
+            const Spacer(flex: 1),
+            // Tagline
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                'Quản lý server ở mọi lúc, mọi nơi, mọi thời điểm.',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 42,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 1.5,
+                  color: Colors.grey.shade500,
+                  fontSize: 14,
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Đang kiểm tra...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white.withOpacity(0.9),
-                ),
+            ),
+            const Spacer(flex: 1),
+            // Buttons
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                children: [
+                  // Get Started button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/auth');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6C8EEF),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Get Started',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // I have an account button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/auth', arguments: true);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF6C8EEF),
+                        side: const BorderSide(
+                          color: Color(0xFF6C8EEF),
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'I have an account',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 48),
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 48),
+          ],
         ),
       ),
     );
   }
-}
 
+}

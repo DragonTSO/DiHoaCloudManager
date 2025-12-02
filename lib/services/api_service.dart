@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/server.dart';
 import '../utils/storage.dart';
@@ -31,16 +32,23 @@ class ApiService {
       final baseUrl = await _getBaseUrl();
       final headers = await _getHeaders();
 
+      debugPrint('[API] getServers - Base URL: $baseUrl');
+      debugPrint('[API] getServers - API Key: ${headers['Authorization']?.substring(0, 20)}...');
+
       if (baseUrl == null) {
         throw Exception('Panel URL chưa được cấu hình');
       }
 
       final url = Uri.parse('$baseUrl/api/client');
+      debugPrint('[API] getServers - Request URL: $url');
+      
       final response = await http.get(url, headers: headers);
+      debugPrint('[API] getServers - Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> serversData = data['data'] ?? [];
+        debugPrint('[API] getServers - Found ${serversData.length} servers in response');
         
         // Parse danh sách server từ response
         List<Server> servers = [];
@@ -77,14 +85,18 @@ class ApiService {
         
         return servers;
       } else if (response.statusCode == 401) {
+        debugPrint('[API] getServers - 401 Unauthorized');
         throw Exception('API Key không hợp lệ');
       } else if (response.statusCode == 404) {
+        debugPrint('[API] getServers - 404 Not Found');
         throw Exception('Panel URL không đúng');
       } else {
         final errorBody = response.body;
+        debugPrint('[API] getServers - Error ${response.statusCode}: $errorBody');
         throw Exception('Lỗi khi lấy danh sách server: ${response.statusCode}\n$errorBody');
       }
     } catch (e) {
+      debugPrint('[API] getServers - Exception: $e');
       if (e.toString().contains('Exception:')) {
         rethrow;
       }

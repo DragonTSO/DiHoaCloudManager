@@ -1,48 +1,112 @@
-# DiHoaManager - Pterodactyl Server Manager
+# DiHoaCloud - Pterodactyl Server Manager
 
-Ứng dụng Android Flutter để quản lý server Pterodactyl thông qua Client API và WebSocket.
+<p align="center">
+  <img src="assets/logo.png" alt="DiHoaCloud Logo" width="120"/>
+</p>
 
-## Tính năng
+<p align="center">
+  <b>Quản lý server Pterodactyl ở mọi lúc, mọi nơi, mọi thời điểm.</b>
+</p>
 
-- 🔐 **Đăng nhập**: Nhập Panel URL và Client API Key
-- 📋 **Danh sách Server**: Xem danh sách tất cả server với trạng thái (running/offline)
-- ⚡ **Điều khiển Server**: Start / Stop / Restart server
-- 💻 **Console Realtime**: Xem log console và gửi lệnh trực tiếp tới server qua WebSocket
+Ứng dụng Flutter đa nền tảng để quản lý server Pterodactyl thông qua Client API và WebSocket.
 
-## API Endpoints
+## ✨ Tính năng
 
-Ứng dụng sử dụng các endpoint sau của Pterodactyl Client API:
+- 🎨 **Giao diện Dark Mode** - UI hiện đại, đẹp mắt
+- 🔐 **Xác thực** - Đăng nhập / Đăng ký tài khoản
+- 📊 **Dashboard** - Tổng quan các panel và server
+- 🖥️ **Multi-Panel** - Hỗ trợ kết nối nhiều Pterodactyl Panel cùng lúc
+- 📋 **Danh sách Server** - Xem tất cả server với trạng thái realtime
+- ⚡ **Điều khiển Server** - Start / Stop / Restart server
+- 💻 **Console Realtime** - Xem log và gửi lệnh qua WebSocket
+- 👤 **Profile** - Quản lý tài khoản và cài đặt
+- 🔒 **Đổi mật khẩu** - Bảo mật tài khoản
 
-- `GET /api/client` - Lấy danh sách server
-- `GET /api/client/servers/{id}/resources` - Lấy trạng thái và tài nguyên server
-- `POST /api/client/servers/{id}/power` - Gửi lệnh power (start/stop/restart)
-- `GET /api/client/servers/{id}/websocket` - Lấy WebSocket token và URL
+## 📱 Screenshots
 
-## Cấu trúc Project
+| Splash | Login | Dashboard |
+|--------|-------|-----------|
+| Welcome Screen | Login/Register | Server List |
+
+| Server Control | Profile | Change Password |
+|----------------|---------|-----------------|
+| Console & Actions | Settings | Security |
+
+## 🚀 App Flow
+
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────┐
+│  1. Splash  │ --> │ 2. Login/Register│ --> │ 3. Dashboard│
+└─────────────┘     └──────────────────┘     └──────┬──────┘
+                                                    │
+                    ┌───────────────────────────────┼───────────────────────────────┐
+                    │                               │                               │
+                    ▼                               ▼                               ▼
+           ┌─────────────────┐           ┌──────────────────┐           ┌─────────────────┐
+           │ 4. Add Panel    │           │ 5. Profile       │           │ Server Control  │
+           │    Sheet (+)    │           │    Settings      │           │                 │
+           └─────────────────┘           └────────┬─────────┘           └─────────────────┘
+                                                  │
+                                                  ▼
+                                         ┌─────────────────┐
+                                         │ 6. Change       │
+                                         │    Password     │
+                                         └─────────────────┘
+```
+
+## 📁 Cấu trúc Project
 
 ```
 lib/
-├── main.dart                 # Entry point
+├── main.dart                      # Entry point & Routes
 ├── models/
-│   └── server.dart          # Model cho server
+│   ├── server.dart               # Model Server
+│   ├── server_stats.dart         # Model Server Stats
+│   └── panel.dart                # Model Panel (multi-panel support)
 ├── services/
-│   ├── api_service.dart     # HTTP client cho Pterodactyl API
-│   └── websocket_service.dart # WebSocket cho console realtime
+│   ├── api_service.dart          # HTTP client cho Pterodactyl API
+│   └── websocket_service.dart    # WebSocket cho console realtime
 ├── screens/
-│   ├── login_screen.dart    # Màn hình đăng nhập
-│   ├── server_list_screen.dart # Màn hình danh sách server
-│   └── server_control_screen.dart # Màn hình điều khiển server
+│   ├── splash_screen.dart        # Màn hình chào
+│   ├── auth_screen.dart          # Đăng nhập / Đăng ký
+│   ├── dashboard_screen.dart     # Dashboard chính
+│   ├── add_panel_sheet.dart      # Bottom sheet thêm panel
+│   ├── server_control_screen.dart # Điều khiển server
+│   ├── profile_screen.dart       # Cài đặt profile
+│   └── change_password_screen.dart # Đổi mật khẩu
 ├── widgets/
-│   └── server_item.dart     # Widget hiển thị item server
+│   └── server_item.dart          # Widget server item
 └── utils/
-    └── storage.dart         # Lưu trữ Panel URL và API Key
+    ├── storage.dart              # Local storage (multi-panel)
+    └── ansi_parser.dart          # Parse ANSI colors cho console
 ```
 
-## Cài đặt
+## 🔌 API Endpoints
+
+Ứng dụng sử dụng các endpoint của Pterodactyl Client API:
+
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| GET | `/api/client` | Lấy danh sách server |
+| GET | `/api/client/servers/{id}/resources` | Lấy trạng thái và tài nguyên |
+| POST | `/api/client/servers/{id}/power` | Gửi lệnh power |
+| GET | `/api/client/servers/{id}/websocket` | Lấy WebSocket token |
+
+## 🛠️ Cài đặt
+
+### Yêu cầu
+
+- Flutter SDK >= 3.10.0
+- Android SDK (cho Android)
+- Xcode (cho iOS/macOS)
+- Pterodactyl Panel với Client API enabled
+- Client API Key (bắt đầu với `ptlc_...`)
+
+### Cài đặt
 
 1. Clone repository:
 ```bash
-git clone https://github.com/DragonTSO/DiHoaCloudManager.git
+git clone https://github.com/user/DiHoaCloudManager.git
 cd DiHoaCloudManager
 ```
 
@@ -53,33 +117,74 @@ flutter pub get
 
 3. Chạy ứng dụng:
 ```bash
-flutter run
+# Android
+flutter run -d android
+
+# iOS
+flutter run -d ios
+
+# Windows
+flutter run -d windows
+
+# macOS
+flutter run -d macos
+
+# Web (có thể gặp lỗi CORS)
+flutter run -d chrome
 ```
 
-## Dependencies
+## ⚠️ Lưu ý về CORS
 
-- `http: ^1.1.0` - HTTP client
-- `web_socket_channel: ^2.4.0` - WebSocket client
-- `shared_preferences: ^2.2.2` - Local storage
-- `provider: ^6.1.1` - State management
+Nếu chạy trên **Web**, bạn có thể gặp lỗi CORS do Pterodactyl Panel không cho phép cross-origin requests từ localhost.
 
-## Yêu cầu
+**Giải pháp:**
+- ✅ Chạy trên Android/iOS/Windows/macOS (khuyên dùng)
+- ⚠️ Disable web security trong Chrome (chỉ để test):
+```bash
+flutter run -d chrome --web-browser-flag "--disable-web-security"
+```
 
-- Flutter SDK >= 3.10.0
-- Android SDK (cho Android app)
-- Pterodactyl Panel với Client API enabled
-- Client API Key với quyền truy cập server
+## 📦 Dependencies
 
-## Lưu ý Bảo mật
+```yaml
+dependencies:
+  flutter: sdk
+  cupertino_icons: ^1.0.8
+  http: ^1.1.0
+  web_socket_channel: ^2.4.0
+  shared_preferences: ^2.2.2
+  provider: ^6.1.1
+```
 
-- Panel URL và API Key được lưu trữ local trên thiết bị bằng SharedPreferences
-- Không hardcode API keys trong code
+## 🔐 Bảo mật
+
+- Panel URL và API Key được lưu local bằng SharedPreferences
+- Hỗ trợ lưu nhiều panel với mỗi panel có API key riêng
 - WebSocket sử dụng token có thời hạn từ Pterodactyl API
+- Không hardcode API keys trong code
 
-## License
+## 🎨 Theme
+
+App sử dụng dark theme với color scheme:
+
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Background | `#0A0E21` | Màu nền chính |
+| Surface | `#1A1F3C` | Cards, inputs |
+| Primary | `#6C8EEF` | Buttons, accents |
+| Success | `#4CAF50` | Online status |
+| Error | `#F44336` | Offline status |
+
+## 📄 License
 
 MIT License
 
-## Tác giả
+## 👨‍💻 Tác giả
 
-DragonTSO
+**DragonTSO**
+
+---
+
+<p align="center">
+  Made with ❤️ using Flutter
+</p>
